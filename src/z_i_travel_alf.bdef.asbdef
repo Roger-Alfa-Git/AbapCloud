@@ -1,0 +1,75 @@
+managed; //implementation in class zbp_i_travel_alf unique;
+//strict ( 2 ); //Uncomment this line in order to enable strict mode 2. The strict mode has two variants (strict(1), strict(2)) and is prerequisite to be future proof regarding syntax and to be able to release your BO.
+
+define behavior for Z_I_TRAVEL_ALF alias Travel
+implementation in class zbp_i_travel_alf unique
+persistent table ztravel_alf
+with additional save
+lock master
+authorization master ( instance )
+etag master last_changed_at
+{
+  field ( readonly ) last_changed_at, last_changed_by, created_at, created_by;
+  field ( mandatory : create ) travel_id, agency_id, overall_status, booking_fee, currency_code;
+  field ( features : instance ) travel_id, overall_status;
+
+  create;
+  update;
+  delete;
+
+  validation validateCustomer on save { create; field customer_id; }
+  validation validateDates on save { create; field begin_date, end_date; }
+  validation validateStatus on save { create; field overall_status; }
+
+  action ( features : instance ) acceptTravel result [1] $self;
+  action ( features : instance ) rejectTravel result [1] $self;
+
+  action createTravelByTemplate result [1] $self;
+
+  association _Booking { create ( features: instance ); }
+
+  mapping for ztravel_alf corresponding;
+}
+
+define behavior for Z_I_BOOKING_ALF alias Booking
+implementation in class zbp_i_booking_alf unique
+persistent table zbooking_alf
+lock dependent by _Travel
+authorization dependent by _Travel
+etag master last_change_at
+{
+  field ( readonly ) travel_id;
+  field ( mandatory : create ) booking_id, carrier_id, connection_id, flight_date, booking_status;
+
+  update;
+  delete;
+
+  validation validateStatus on save { create; field booking_status; }
+
+  determination calculateTotalFlightPrice on modify { field flight_price, currency_code; }
+
+  association _BookingSupplement { create ( features : instance ); }
+  association _Travel ;
+
+  mapping for zbooking_alf corresponding;
+}
+
+define behavior for Z_I_BOOKSUPPL_ALF alias Supplement
+implementation in class zbp_i_booksuppl_alf unique
+with unmanaged save
+lock dependent by _Travel
+authorization dependent by _Travel
+etag master last_changed_at
+{
+  field ( readonly ) travel_id, booking_id;
+  field ( mandatory : create ) supplement_id, price;
+
+  update;
+  delete;
+
+  determination calculateTotalSupplPrice on modify { field price, currency; }
+
+  mapping for zbooksuppl_alf corresponding;
+
+  association _Travel ;
+}
